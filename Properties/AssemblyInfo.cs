@@ -1,16 +1,15 @@
 ﻿using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("DatNetLib")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("Dsnlib")]
+[assembly: AssemblyDescription("Lightweight and highly scalable C# networking library")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("DatNetLib")]
-[assembly: AssemblyCopyright("Copyright ©  2017")]
+[assembly: AssemblyCompany("TheDivergentNetwork")]
+[assembly: AssemblyProduct("Dsnlib")]
+[assembly: AssemblyCopyright("Copyright © 2017 Divergent Studios")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
