@@ -14,7 +14,6 @@ namespace DivergentNetwork {
         public bool IsConnected { get; set; }
 
         public RemoteUdpClient(string ip, int port, int networkID, DateTime timeCreated) {
-
             IP = ip;
             Port = port;
             NetworkID = networkID;

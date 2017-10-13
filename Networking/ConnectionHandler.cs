@@ -12,45 +12,55 @@ namespace DivergentNetwork {
         private static object connectionLock = new object();
 
         // This client adds a new client and returns the new client id
-        public static void AddConnection(RemoteUdpClient remoteClient, Action<int> networkID) {
+        public static void Add(RemoteUdpClient remoteClient, int networkId) {
 
             if (remoteClient == null) {
-                throw new ArgumentNullException("RemoteUdpClient", "RemoteUdpClient cannot be null");
+                throw new ArgumentNullException("RemoteUdpClient", "RemoteUdpClient cannot be null.");
+            }
+            if (networkId < 0) {
+                throw new ArgumentOutOfRangeException("NetworkID", "NetworkID must be greater than 0.");
             }
 
             lock (connectionLock) {
-                int index = FindFreeClientIndex();
-
-                if (index != -1) {
-                    RemoteClients[index] = remoteClient;
-                    CurrentlyConnectedClients++;
-                }
-                networkID.Invoke(index);
+                RemoteClients[networkId] = remoteClient;
+                CurrentlyConnectedClients++;
             }
         }
 
 
+        // This function finds a free slot for a client to join the network (if any are free)
+        // Returns -1 if no spot is available
+        public static int GetAvailableNetworkIndex() {
+
+            lock (connectionLock) {
+                for (int i = 0; i < MaxNumberOfConnections; i++) {
+                    if (RemoteClients[i] == null) {
+                        return i;
+                    }
+                }
+                // Return -1 if server is full
+                return -1;
+            }
+        }
+
         // This simply searches for a client by address and returns it's client index
         // Returns -1 if the client is new
-        public static int FindExistingConnectionIndex(RemoteUdpClient remoteClient) {
-
-            if (remoteClient == null) {
+        public static int FindExistingConnectionIndex(string ip, int port) {
+        
+            if (string.IsNullOrEmpty(ip)) {
                 throw new ArgumentNullException("RemoteUdpClient", "RemoteUdpClient cannot be null");
             }
 
             lock (connectionLock) {
-                // Determine if the client already exists
                 for (int i = 0; i < MaxNumberOfConnections; i++) {
-                    if (RemoteClients[i] != null && 
-                        RemoteClients[i].IsConnected && 
-                        RemoteClients[i].IP == remoteClient.IP && 
-                        RemoteClients[i].Port == remoteClient.Port) {
+                    if (RemoteClients[i] != null && RemoteClients[i].IP == ip && RemoteClients[i].Port == port) {
                         return i;
                     }
                 }
                 return -1;
             }
         }
+
 
         // This function determines whether or not an existing connection has timed out
         public static bool HasConnectionTimedOut(RemoteUdpClient remoteClient, int timeOut) {
@@ -72,20 +82,6 @@ namespace DivergentNetwork {
                 }
                 return timedOut;
             }
-        }
-
-
-        // This function finds a free slot for a client to join the network (if any are free)
-        // Returns -1 if no spot is available
-        private static int FindFreeClientIndex() {
-
-            for (int i = 0; i < MaxNumberOfConnections; i++) {  
-                // This means that a space is available on the server
-                if (RemoteClients[i] == null)
-                return i;
-            }
-            // Return -1 if server is full
-            return -1;
         }
 
 

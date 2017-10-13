@@ -7,8 +7,8 @@
     <ProjectGuid>{F33B2FBE-522B-4C1D-8E9D-58A3AAF4DA42}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DatNetLib</RootNamespace>
-    <AssemblyName>DatNetLib</AssemblyName>
+    <RootNamespace>DivergentNetwork</RootNamespace>
+    <AssemblyName>Dsnlib</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />

@@ -29,10 +29,6 @@ namespace DivergentNetwork {
         public Socket Socket { get; private set; }
         public IPEndPoint EndPoint { get; private set; }
 
-        // Time stamps for send/receive operations
-        public DateTime TimeSinceLastReceivedDatagram;
-        public DateTime TimeSinceLastSentDatagram;
-
         // Event handler for receiving datagrams
         public event EventHandler<DatagramReceivedEventArgs> OnDatagramReceived;
 
@@ -93,28 +89,11 @@ namespace DivergentNetwork {
         }
 
 
-        public void Send(byte[] data, int length) {
-
-            if (IsServer) return;
-
-            // Create a new byte array segment with the byte array data we want to send
-            sendSegments.Enqueue(new DnlByteArraySegment(data));
-
-            // Ensure we aren't already trying to send data
-            if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0) {
-                BeginSend();
-            }
-        }
-
-
         private void BeginReceive() {
 
             // Setup our socket callback args
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-
-            // If this instance is constructed as a server, then we want to set the remote end point to listen on all network interfaces for incoming network activity
-            // If this instance is constructed as a client, then it will simply listen for activity only from the remote host
-            args.RemoteEndPoint = IsServer ? new IPEndPoint(IPAddress.Any, 0) : EndPoint;
+            args.RemoteEndPoint = EndPoint;
             args.SetBuffer(receiveBuffer, 0, receiveBuffer.Length);
             args.Completed += OnOperationComplete;
 
@@ -173,7 +152,7 @@ namespace DivergentNetwork {
                 }
             }
             catch (Exception e) {
-                DnlDebugger.LogMessage("Caught exception in EndReceive: " + e.Message + " | " + e.InnerException, true);
+                DnlDebugger.LogMessage("Caught exception in EndReceive: " + e.Message + " | " + e.TargetSite.ToString(), true);
             }
             finally {
                 args.Dispose();
@@ -181,9 +160,49 @@ namespace DivergentNetwork {
             }
         }
 
+        // Used for sending from client to server
+        public void Send(byte[] data, int length)
+        {
+
+            // Ensure only client instance can use this method
+            if (IsServer) {
+                return;
+            }
+
+            // Create a new byte array segment with the byte array data we want to send
+            sendSegments.Enqueue(new DnlByteArraySegment(data));
+
+            // Ensure we aren't already trying to send data
+            if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0) {
+                BeginSend(null);
+            }
+        }
+
+
+        // Use for sending from server to client
+        public void Send(byte[] data, int length, RemoteUdpClient remoteUdpClient)
+        {
+
+            if (!IsServer) {
+                return;
+            }
+
+            // Create a new byte array segment with the byte array data we want to send
+            sendSegments.Enqueue(new DnlByteArraySegment(data));
+
+            // Ensure we aren't already trying to send data
+            if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0) {
+                BeginSend(remoteUdpClient);
+            }
+        }
+
 
         // This is called after the byte array segment has been queued
-        private void BeginSend() {
+        // When null is passed as the client, it means a client user is using this instance class
+        // Otherwise this server instance is sending to a client
+        private void BeginSend(RemoteUdpClient client) {
+
+            bool isClient = client == null && !IsServer;
 
             // Setup the async socket event args that will be used to handle callbacks and send/receive data 
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
@@ -195,9 +214,9 @@ namespace DivergentNetwork {
             if ((segment = sendSegments.Peek()) != null) {
                 // Setup our event args callback
                 args.Completed += BeginSendCallback;
-                args.RemoteEndPoint = EndPoint;
+                args.RemoteEndPoint = isClient ? EndPoint : new IPEndPoint(IPAddress.Parse(client.IP), client.Port);
                 args.SetBuffer(segment.Buffer, segment.Start, segment.Length);
-
+                args.UserToken = !isClient ? client : null;
                 bool willRaiseEvent = Socket.SendToAsync(args);
                 
                 // Asynchronously send the data to the socket - returns true if request is still pending
@@ -231,7 +250,11 @@ namespace DivergentNetwork {
 
                     // Recursively send the data if there's more segments to send
                     if (sendSegments.Count > 0) {
-                        BeginSend();
+                        if (args.UserToken != null) {
+
+                            RemoteUdpClient token = (RemoteUdpClient)args.UserToken;
+                            BeginSend(token);
+                        }
                     }
                     else {
                         // Set this thread's sending state to idle
