@@ -43,11 +43,11 @@
     <Compile Include="Networking\ReceivePacket.cs" />
     <Compile Include="Networking\RPCTarget.cs" />
     <Compile Include="Networking\SendPacket.cs" />
-    <Compile Include="Networking\RemoteUdpClient.cs" />
-    <Compile Include="Tools\DnlByteArraySegment.cs" />
+    <Compile Include="Networking\RemoteUdpPeer.cs" />
+    <Compile Include="Tools\DnlUdpSendSegment.cs" />
     <Compile Include="Networking\DatagramReceivedEventArgs.cs" />
     <Compile Include="Networking\ConnectionHandler.cs" />
-    <Compile Include="Networking\DnlUdpClient.cs" />
+    <Compile Include="Networking\DnlUdpPeer.cs" />
     <Compile Include="Networking\QosType.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tools\DnlDebugger.cs" />

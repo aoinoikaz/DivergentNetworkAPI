@@ -8,19 +8,22 @@ using DivergentNetwork.Tools;
 
 namespace DivergentNetwork {
 
-    public class DnlUdpClient {
+    public class DnlUdpPeer {
 
         // Internally used
         private int isSending;
         private int maxBufferSize;
         private byte[] receiveBuffer;
-        private Queue<DnlByteArraySegment> sendSegments;
+        private Queue<DnlUdpSendSegment> sendSegments;
 
         // Properties 
         public int ClientID { get; private set; }
         public int ConnectionTimeout { get; private set; }
         public bool IsListening { get; private set; }
         public bool IsServer { get; private set; }
+
+        // TODO: implement reliability and congestion system
+        //public QosType QosType { get; private set; }
 
         // The 2 byte identifier that is used internally for sending/receiving datagrams
         public ushort ProtocolId { get; private set; }
@@ -33,28 +36,32 @@ namespace DivergentNetwork {
         public event EventHandler<DatagramReceivedEventArgs> OnDatagramReceived;
 
         // Construct as 'server' object
-        public DnlUdpClient(int port, ushort protocolId, int connectionTimeout, int bufferSize) {
+        public DnlUdpPeer(int port, ushort protocolId, int connectionTimeout, int bufferSize) {
             IsServer = true;
             ConnectionTimeout = connectionTimeout;
             maxBufferSize = bufferSize;
             ProtocolId = protocolId;
             receiveBuffer = new byte[maxBufferSize];
-            sendSegments = new Queue<DnlByteArraySegment>();
+            sendSegments = new Queue<DnlUdpSendSegment>();
             Socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            //Socket.Blocking = false;
             EndPoint = new IPEndPoint(IPAddress.Any, port);
             Socket.Bind(EndPoint);
+            //QosType = qosType;
         }
 
 
         // Construct a 'client' object to a specific end point
-        public DnlUdpClient(string ip, int port, ushort protocolId, int bufferSize) {
+        public DnlUdpPeer(string ip, int port, ushort protocolId, int bufferSize) {
             IsServer = false;
             ProtocolId = protocolId;
             maxBufferSize = bufferSize;
             receiveBuffer = new byte[maxBufferSize];
-            sendSegments = new Queue<DnlByteArraySegment>();
+            sendSegments = new Queue<DnlUdpSendSegment>();
             Socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            //Socket.Blocking = false;
             EndPoint = new IPEndPoint(IPAddress.Parse(ip), port);
+            //QosType = qosType;
         }
 
 
@@ -115,19 +122,14 @@ namespace DivergentNetwork {
                 // No bytes been transferred from this async operation
                 if (args.BytesTransferred <= 0) {
                     DnlDebugger.LogMessage("0 bytes transferred from receive operation: " + args.RemoteEndPoint.ToString() + " | " +  args.BytesTransferred, true);
-                }
-                else {
+                } else {
                     ushort protocolId;
                     ushort operationCode;
 
                     // Parse and validate protocol id and operation code
-                    if ((protocolId = unchecked(BitConverter.ToUInt16(args.Buffer, 0))) != ProtocolId) {
-                        throw new Exception("Received datagram with different protocol id then expected. Either set your protocol id or ensure network traffic is from known clients.");
-                    }
+                    if ((protocolId = unchecked(BitConverter.ToUInt16(args.Buffer, 0))) != ProtocolId) { throw new Exception("Received datagram with different protocol id then expected. Either set your protocol id or ensure network traffic is from known clients."); }
 
-                    if (!OperationCodes.ReceivePacket.ContainsKey(operationCode = unchecked(BitConverter.ToUInt16(args.Buffer, 2)))) {
-                        throw new Exception("Received datagram with different unregistered operation code. Either register your operation packet handler or ensure network traffic is from known clients.");
-                    }
+                    if (!OperationCodes.ReceivePacket.ContainsKey(operationCode = unchecked(BitConverter.ToUInt16(args.Buffer, 2)))) { throw new Exception("Received datagram with different unregistered operation code. Either register your operation packet handler or ensure network traffic is from known clients."); }
 
                     int payloadLength = args.BytesTransferred - (sizeof(ushort) * 2);
                     byte[] payload = new byte[payloadLength];
@@ -139,7 +141,7 @@ namespace DivergentNetwork {
                     string[] systemAddress = !string.IsNullOrEmpty(args.RemoteEndPoint.ToString()) ? 
                         args.RemoteEndPoint.ToString().Split(':') :
                         throw new Exception("Internal issue trying to parse remote endpoint from incoming datagram. Contact support");
-                    
+
                     // Invoke the on received event
                     OnDatagramReceived?.Invoke(this, new DatagramReceivedEventArgs(
                         systemAddress[0],
@@ -150,19 +152,17 @@ namespace DivergentNetwork {
                         payload.Length,
                         DateTime.Now));
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 DnlDebugger.LogMessage("Caught exception in EndReceive: " + e.Message + " | " + e.TargetSite.ToString(), true);
-            }
-            finally {
+            } finally {
                 args.Dispose();
                 BeginReceive();
             }
         }
 
+
         // Used for sending from client to server
-        public void Send(byte[] data, int length)
-        {
+        public void Send(byte[] data, int length) {
 
             // Ensure only client instance can use this method
             if (IsServer) {
@@ -170,29 +170,28 @@ namespace DivergentNetwork {
             }
 
             // Create a new byte array segment with the byte array data we want to send
-            sendSegments.Enqueue(new DnlByteArraySegment(data));
+            sendSegments.Enqueue(new DnlUdpSendSegment(data));
 
             // Ensure we aren't already trying to send data
             if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0) {
-                BeginSend(null);
+                BeginSend();
             }
         }
 
 
         // Use for sending from server to client
-        public void Send(byte[] data, int length, RemoteUdpClient remoteUdpClient)
-        {
+        public void Send(byte[] data, int length, RemoteUdpPeer remoteUdpClient) {
 
             if (!IsServer) {
                 return;
             }
 
             // Create a new byte array segment with the byte array data we want to send
-            sendSegments.Enqueue(new DnlByteArraySegment(data));
+            sendSegments.Enqueue(new DnlUdpSendSegment(data, remoteUdpClient));
 
             // Ensure we aren't already trying to send data
             if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0) {
-                BeginSend(remoteUdpClient);
+                BeginSend();
             }
         }
 
@@ -200,23 +199,22 @@ namespace DivergentNetwork {
         // This is called after the byte array segment has been queued
         // When null is passed as the client, it means a client user is using this instance class
         // Otherwise this server instance is sending to a client
-        private void BeginSend(RemoteUdpClient client) {
+        private void BeginSend() {
 
-            bool isClient = client == null && !IsServer;
+            bool isClient = !IsServer;
 
             // Setup the async socket event args that will be used to handle callbacks and send/receive data 
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
 
             // Declare a byte array segment
-            DnlByteArraySegment segment;
+            DnlUdpSendSegment segment;
 
             // Fill the segment with the data we want to send
             if ((segment = sendSegments.Peek()) != null) {
                 // Setup our event args callback
-                args.Completed += BeginSendCallback;
-                args.RemoteEndPoint = isClient ? EndPoint : new IPEndPoint(IPAddress.Parse(client.IP), client.Port);
+                args.Completed += OnOperationComplete;
+                args.RemoteEndPoint = isClient ? EndPoint : new IPEndPoint(IPAddress.Parse(segment.Peer.IP), segment.Peer.Port);
                 args.SetBuffer(segment.Buffer, segment.Start, segment.Length);
-                args.UserToken = !isClient ? client : null;
                 bool willRaiseEvent = Socket.SendToAsync(args);
                 
                 // Asynchronously send the data to the socket - returns true if request is still pending
@@ -238,7 +236,7 @@ namespace DivergentNetwork {
                 }
 
                 // Another temp holder
-                DnlByteArraySegment segment;
+                DnlUdpSendSegment segment;
 
                 // If theres more segments
                 if ((segment = sendSegments.Peek()) != null) {
@@ -247,25 +245,17 @@ namespace DivergentNetwork {
                     if (segment.Advance(args.BytesTransferred)) {
                         sendSegments.Dequeue();
                     }
-
                     // Recursively send the data if there's more segments to send
                     if (sendSegments.Count > 0) {
-                        if (args.UserToken != null) {
-
-                            RemoteUdpClient token = (RemoteUdpClient)args.UserToken;
-                            BeginSend(token);
-                        }
-                    }
-                    else {
+                        BeginSend();
+                    } else {
                         // Set this thread's sending state to idle
                         isSending = 0;
                     }
                 }
-            }
-            catch (Exception e) {
-                DnlDebugger.LogMessage("Caught exception in EndSendCallback: " + e.Message + " | " + e.InnerException, true);
-            }
-            finally {
+            } catch (Exception e) {
+                DnlDebugger.LogMessage("Caught exception in EndSendCallback: " + e.Message + " | " + e.TargetSite.ToString(), true);
+            } finally {
                 args.Dispose();
             }
         }

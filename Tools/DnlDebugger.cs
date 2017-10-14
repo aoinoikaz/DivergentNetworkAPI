@@ -3,7 +3,7 @@ using System.IO;
 
 namespace DivergentNetwork.Tools {
 
-    public class DnlDebugger {
+    public static class DnlDebugger {
 
         public static string FilePath { get; set; }
 
