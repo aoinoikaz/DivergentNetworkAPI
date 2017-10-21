@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace DivergentNetwork.Tools {
-
-    public sealed class DnlUdpSendSegment : IDisposable {
-
+namespace DivergentNetwork.Tools
+{
+    public sealed class DnlUdpSendSegment : IDisposable
+    {
         // The byte array segments buffer
         public byte[] Buffer { get; private set; }
         
@@ -17,7 +17,8 @@ namespace DivergentNetwork.Tools {
         public RemoteUdpPeer Peer { get; private set; }
 
         // Concstructs a new byte array segment
-        public DnlUdpSendSegment(byte[] buffer) {
+        public DnlUdpSendSegment(byte[] buffer)
+        {
             Start = 0;
             Buffer = buffer;
             Length = Buffer.Length;
@@ -25,7 +26,8 @@ namespace DivergentNetwork.Tools {
 
 
         // Concstructs a new byte array segment
-        public DnlUdpSendSegment(byte[] buffer, RemoteUdpPeer peer) {
+        public DnlUdpSendSegment(byte[] buffer, RemoteUdpPeer peer)
+        {
             Start = 0;
             Buffer = buffer;
             Length = Buffer.Length;
@@ -34,9 +36,10 @@ namespace DivergentNetwork.Tools {
 
 
         // Constructs a new byte array segment that start offset and length
-        public DnlUdpSendSegment(byte[] buffer, int start, int length) {
-
-            if (start + length > buffer.Length) {
+        public DnlUdpSendSegment(byte[] buffer, int start, int length)
+        {
+            if (start + length > buffer.Length)
+            {
                 throw new ArgumentOutOfRangeException("length", "The segment doesn't fit the array bounds.");
             }
 
@@ -47,7 +50,8 @@ namespace DivergentNetwork.Tools {
 
 
         // Advance to the new byte array segment
-        public bool Advance(int pLength) {
+        public bool Advance(int pLength)
+        {
             Start += pLength;
             Length -= pLength;
             return Length <= 0;

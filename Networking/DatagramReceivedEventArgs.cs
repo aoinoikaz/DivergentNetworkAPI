@@ -1,8 +1,10 @@
 ﻿using System;
 
-namespace DivergentNetwork {
+namespace DivergentNetwork
+{
 
-    public sealed class DatagramReceivedEventArgs : EventArgs {
+    public sealed class DatagramReceivedEventArgs : EventArgs
+    {
 
         public DateTime TimeReceived { get; private set; }
 
@@ -15,7 +17,8 @@ namespace DivergentNetwork {
         public byte[] Data { get; private set; }
         public int BytesDelivered { get; private set; }
 
-        public DatagramReceivedEventArgs(string ip, int port, ushort protocolID, ushort opCode, byte[] data, int bytesDelivered, DateTime timeReceived) {
+        public DatagramReceivedEventArgs(string ip, int port, ushort protocolID, ushort opCode, byte[] data, int bytesDelivered, DateTime timeReceived)
+        {
             IP = ip;
             Port = port;
             ProtocolID = protocolID;

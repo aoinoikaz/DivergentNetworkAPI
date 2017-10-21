@@ -6,10 +6,10 @@ using System.Collections.Generic;
 
 using DivergentNetwork.Tools;
 
-namespace DivergentNetwork {
-
-    public class DnlUdpPeer {
-
+namespace DivergentNetwork
+{
+    public class DnlUdpPeer
+    {
         // Internally used
         private int isSending;
         private int maxBufferSize;
@@ -36,7 +36,8 @@ namespace DivergentNetwork {
         public event EventHandler<DatagramReceivedEventArgs> OnDatagramReceived;
 
         // Construct as 'server' object
-        public DnlUdpPeer(int port, ushort protocolId, int connectionTimeout, int bufferSize) {
+        public DnlUdpPeer(int port, ushort protocolId, int connectionTimeout, int bufferSize)
+        {
             IsServer = true;
             ConnectionTimeout = connectionTimeout;
             maxBufferSize = bufferSize;
@@ -52,7 +53,8 @@ namespace DivergentNetwork {
 
 
         // Construct a 'client' object to a specific end point
-        public DnlUdpPeer(string ip, int port, ushort protocolId, int bufferSize) {
+        public DnlUdpPeer(string ip, int port, ushort protocolId, int bufferSize)
+        {
             IsServer = false;
             ProtocolId = protocolId;
             maxBufferSize = bufferSize;
@@ -66,8 +68,8 @@ namespace DivergentNetwork {
 
 
         // This method starts listening 
-        public void Start() {
-
+        public void Start()
+        {
             if (IsListening)
                 return;
 
@@ -77,59 +79,77 @@ namespace DivergentNetwork {
         }
 
 
-        public void Stop() {
-
+        public void Stop()
+        {
             if (!IsListening)
                 return;
 
             IsListening = false;
 
-            try {
+            try
+            {
                 Socket.Shutdown(SocketShutdown.Both);
             }
-            catch (Exception e) {
+            catch (Exception e)
+            {
                 DnlDebugger.LogMessage("Exception caught when trying to shut down listener: " + e.Message, true);
             }
-            finally {
+            finally
+            {
                 Socket.Close();
             }
         }
 
 
-        private void BeginReceive() {
-
+        private void BeginReceive()
+        {
             // Setup our socket callback args
-            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = EndPoint;
+            SocketAsyncEventArgs args = new SocketAsyncEventArgs
+            {
+                RemoteEndPoint = EndPoint
+            };
             args.SetBuffer(receiveBuffer, 0, receiveBuffer.Length);
             args.Completed += OnOperationComplete;
 
             bool willRaiseEvent = Socket.ReceiveFromAsync(args);
 
             // If this completes synchronously, then trigger the event manually
-            if (!willRaiseEvent) {
+            if (!willRaiseEvent)
+            {
                 BeginReceiveCallback(this, args);
             }
         }
 
 
-        private void BeginReceiveCallback(object sender, SocketAsyncEventArgs args) {
-
+        private void BeginReceiveCallback(object sender, SocketAsyncEventArgs args)
+        {
             if (!IsListening)
+            {
                 return;
+            }
 
-            try {
+            try
+            {
                 // No bytes been transferred from this async operation
-                if (args.BytesTransferred <= 0) {
+                if (args.BytesTransferred <= 0)
+                {
                     DnlDebugger.LogMessage("0 bytes transferred from receive operation: " + args.RemoteEndPoint.ToString() + " | " +  args.BytesTransferred, true);
-                } else {
+                }
+                else
+                {
                     ushort protocolId;
                     ushort operationCode;
 
                     // Parse and validate protocol id and operation code
-                    if ((protocolId = unchecked(BitConverter.ToUInt16(args.Buffer, 0))) != ProtocolId) { throw new Exception("Received datagram with different protocol id then expected. Either set your protocol id or ensure network traffic is from known clients."); }
+                    if ((protocolId = unchecked(BitConverter.ToUInt16(args.Buffer, 0))) != ProtocolId)
+                    {
+                        throw new Exception("Received datagram with different protocol id then expected. Either set your protocol id or ensure network traffic is from known clients.");
+                    }
 
-                    if (!OperationCodes.ReceivePacket.ContainsKey(operationCode = unchecked(BitConverter.ToUInt16(args.Buffer, 2)))) { throw new Exception("Received datagram with different unregistered operation code. Either register your operation packet handler or ensure network traffic is from known clients."); }
+                    if (!OperationCodes.ReceivePacket.ContainsKey(operationCode = unchecked(BitConverter.ToUInt16(args.Buffer, 2))))
+                    {
+                        throw new Exception("Received datagram with different unregistered operation code. Either register your operation packet handler or ensure network traffic is from known clients.");
+                    }
 
                     int payloadLength = args.BytesTransferred - (sizeof(ushort) * 2);
                     byte[] payload = new byte[payloadLength];
@@ -152,9 +172,13 @@ namespace DivergentNetwork {
                         payload.Length,
                         DateTime.Now));
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 DnlDebugger.LogMessage("Caught exception in EndReceive: " + e.Message + " | " + e.TargetSite.ToString(), true);
-            } finally {
+            }
+            finally
+            {
                 args.Dispose();
                 BeginReceive();
             }
@@ -162,10 +186,11 @@ namespace DivergentNetwork {
 
 
         // Used for sending from client to server
-        public void Send(byte[] data, int length) {
-
+        public void Send(byte[] data, int length)
+        {
             // Ensure only client instance can use this method
-            if (IsServer) {
+            if (IsServer)
+            {
                 return;
             }
 
@@ -173,16 +198,18 @@ namespace DivergentNetwork {
             sendSegments.Enqueue(new DnlUdpSendSegment(data));
 
             // Ensure we aren't already trying to send data
-            if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0) {
+            if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0)
+            {
                 BeginSend();
             }
         }
 
 
         // Use for sending from server to client
-        public void Send(byte[] data, int length, RemoteUdpPeer remoteUdpClient) {
-
-            if (!IsServer) {
+        public void Send(byte[] data, int length, RemoteUdpPeer remoteUdpClient)
+        {
+            if (!IsServer)
+            {
                 return;
             }
 
@@ -190,7 +217,8 @@ namespace DivergentNetwork {
             sendSegments.Enqueue(new DnlUdpSendSegment(data, remoteUdpClient));
 
             // Ensure we aren't already trying to send data
-            if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0) {
+            if (Interlocked.CompareExchange(ref isSending, 1, 0) == 0)
+            {
                 BeginSend();
             }
         }
@@ -199,8 +227,8 @@ namespace DivergentNetwork {
         // This is called after the byte array segment has been queued
         // When null is passed as the client, it means a client user is using this instance class
         // Otherwise this server instance is sending to a client
-        private void BeginSend() {
-
+        private void BeginSend()
+        {
             bool isClient = !IsServer;
 
             // Setup the async socket event args that will be used to handle callbacks and send/receive data 
@@ -210,7 +238,8 @@ namespace DivergentNetwork {
             DnlUdpSendSegment segment;
 
             // Fill the segment with the data we want to send
-            if ((segment = sendSegments.Peek()) != null) {
+            if ((segment = sendSegments.Peek()) != null)
+            {
                 // Setup our event args callback
                 args.Completed += OnOperationComplete;
                 args.RemoteEndPoint = isClient ? EndPoint : new IPEndPoint(IPAddress.Parse(segment.Peer.IP), segment.Peer.Port);
@@ -218,7 +247,8 @@ namespace DivergentNetwork {
                 bool willRaiseEvent = Socket.SendToAsync(args);
                 
                 // Asynchronously send the data to the socket - returns true if request is still pending
-                if (!willRaiseEvent) {
+                if (!willRaiseEvent)
+                {
                     // Clean up after sending the data
                     BeginSendCallback(this, args);
                 }
@@ -227,10 +257,12 @@ namespace DivergentNetwork {
 
 
         // This is called after the byte array segments have been successfully sent to the connected socket
-        private void BeginSendCallback(object sender, SocketAsyncEventArgs args) {
-
-            try {
-                if (args.BytesTransferred <= 0) {
+        private void BeginSendCallback(object sender, SocketAsyncEventArgs args)
+        {
+            try
+            {
+                if (args.BytesTransferred <= 0)
+                {
                     DnlDebugger.LogMessage("0 bytes transferred in the last send operation", true);
                     return;
                 }
@@ -239,23 +271,31 @@ namespace DivergentNetwork {
                 DnlUdpSendSegment segment;
 
                 // If theres more segments
-                if ((segment = sendSegments.Peek()) != null) {
-                    
+                if ((segment = sendSegments.Peek()) != null)
+                {
                     // If the current segment has been advanced
-                    if (segment.Advance(args.BytesTransferred)) {
+                    if (segment.Advance(args.BytesTransferred))
+                    {
                         sendSegments.Dequeue();
                     }
                     // Recursively send the data if there's more segments to send
-                    if (sendSegments.Count > 0) {
+                    if (sendSegments.Count > 0)
+                    {
                         BeginSend();
-                    } else {
+                    }
+                    else
+                    {
                         // Set this thread's sending state to idle
                         isSending = 0;
                     }
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 DnlDebugger.LogMessage("Caught exception in EndSendCallback: " + e.Message + " | " + e.TargetSite.ToString(), true);
-            } finally {
+            }
+            finally
+            {
                 args.Dispose();
             }
         }
@@ -263,10 +303,11 @@ namespace DivergentNetwork {
 
         // This is called automatically when a read/write operation completes
         // on a socket
-        private void OnOperationComplete(object sender, SocketAsyncEventArgs e) {
-
+        private void OnOperationComplete(object sender, SocketAsyncEventArgs e)
+        {
             // determine which type of operation just completed and call the associated handler
-            switch (e.LastOperation) {
+            switch (e.LastOperation)
+            {
                 case SocketAsyncOperation.ReceiveFrom:
                     BeginReceiveCallback(this, e);
                     break;

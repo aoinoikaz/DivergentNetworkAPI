@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace DivergentNetwork {
-
-    public sealed class RemoteUdpPeer {
-
+namespace DivergentNetwork
+{
+    public sealed class RemoteUdpPeer
+    {
         public DateTime TimeSinceLastReceivedDatagram { get; set; }
         public DateTime TimeCreated { get; private set; }
         public bool IsConnected { get; set; }
@@ -13,7 +13,8 @@ namespace DivergentNetwork {
         public ushort SequenceNumber { get; set; }
         public uint Ack { get; set; }
 
-        public RemoteUdpPeer(string ip, int port, int networkID, DateTime timeCreated) {
+        public RemoteUdpPeer(string ip, int port, int networkID, DateTime timeCreated)
+        {
             IP = ip;
             Port = port;
             NetworkID = networkID;
